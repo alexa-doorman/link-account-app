@@ -1,15 +1,24 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 import json
 from decimal import Decimal
 
-from flask import Flask, request, make_response, jsonify, render_template, redirect, url_for
+from os.path import join, dirname
+from dotenv import load_dotenv
+
+dotenv_path = join(dirname(__file__), '.env')
+load_dotenv(dotenv_path)
+
+from flask import Flask, request, make_response, jsonify, render_template, redirect, url_for, session
 import flask_login
+from flask_oauthlib.provider import OAuth2Provider
+
 import requests
 
 from tables.users_table import UsersTable
 from tables.user import User
+import oauth_client
 
 logger = logging.getLogger('app')
 logger.setLevel(logging.INFO)
@@ -29,14 +38,6 @@ ch.setFormatter(formatter)
 logger.addHandler(ch)
 
 
-# Try to load secret file
-if os.path.isfile(os.path.join(os.getcwd(), 'secret.py')):
-    import secret
-    os.environ['DOORMAN_LWA_KEY'] = secret.DOORMAN_LWA_KEY
-    os.environ['DOORMAN_LWA_SECRET'] = secret.DOORMAN_LWA_SECRET
-    os.environ['SECRET_KEY'] = secret.SECRET_KEY
-
-
 app = Flask(__name__)
 
 app.config['LWA'] = {
@@ -45,18 +46,20 @@ app.config['LWA'] = {
 }
 app.config['DEBUG'] = os.environ.get('DEBUG') == 'True'
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'CHANGE_IN_PRODUCTION')
-app.config['SERVER_NAME'] = os.environ.get('SERVER_NAME', '0.0.0.0')
+if not app.debug:
+    app.config['SERVER_NAME'] = os.environ.get('SERVER_NAME', '0.0.0.0')
 
 login_manager = flask_login.LoginManager()
 login_manager.init_app(app)
+oauth = OAuth2Provider()
+oauth.init_app(app)
 
 
 @login_manager.user_loader
 def user_loader(amazon_id):
     user_data = UsersTable(amazon_id).get()
     if user_data:
-        user = User()
-        user.id = user_data['amazon_id']
+        user = User(user_data['amazon_id'])
         user.data = user_data
         return user
 
@@ -69,16 +72,101 @@ def page_not_found(error):
 
 
 @app.errorhandler(500)
-def page_not_found(error):
+def internal_error(error):
     logger.exception(str(error))
     return make_response(jsonify({'status': 500,
                                   'route': request.url,
                                   'message': 'Internal Server Error'}), 500)
 
 
+@oauth.clientgetter
+def load_client(client_id):
+    return oauth_client.StaticOAuthClient()
+
+
+@oauth.grantgetter
+def load_grant(client_id, code):
+    info = UsersTable.get_grant(client_id=client_id, code=code)
+    grant = info.get('oa_grant')
+    if grant:
+        grant = json.loads(grant)
+        return oauth_client.Grant(user_id=info['amazon_id'],
+                                  user=User(info['amazon_id']),
+                                  client_id=grant['client_id'],
+                                  client=oauth_client.StaticOAuthClient(),
+                                  code=grant['code'],
+                                  redirect_uri=grant['redirect_uri'],
+                                  expires=datetime.strptime(
+                                      grant['expires'], '%Y-%m-%d %H:%M:%S'),
+                                  _scopes=grant['_scopes']
+                                  )
+
+
+@oauth.grantsetter
+def save_grant(client_id, code, request, *args, **kwargs):
+    # decide the expires time yourself
+    expires = datetime.utcnow() + timedelta(seconds=100)
+    grant = {
+        'client_id': client_id,
+        'code': code['code'],
+        'redirect_uri': request.redirect_uri,
+        '_scopes': ' '.join(request.scopes),
+        'expires': expires.strftime('%Y-%m-%d %H:%M:%S')
+    }
+    UsersTable(flask_login.current_user.id).update_set(
+        oa_grant=json.dumps(grant), client_id=client_id, code=code['code'])
+    return grant
+
+
+@oauth.tokengetter
+def load_token(access_token=None):
+    if access_token:
+        info = UsersTable.get_token_by_access_id(access_token)
+        token = info['oa_token']
+        if token:
+            return oauth_client.Token(client_id=token['client_id'],
+                                      client=oauth_client.StaticOAuthClient(),
+                                      user_id=info['amazon_id'],
+                                      token_type=token['token_type'],
+                                      access_token=token['access_token'],
+                                      refresh_token=token['refresh_token'],
+                                      expires=datetime.strptime(
+                                          token['expires'], '%Y-%m-%d %H:%M:%S'),
+                                      _scopes=token['_scopes'])
+
+
+@oauth.tokensetter
+def save_token(token, request, *args, **kwargs):
+    expires_in = token.get('expires_in')
+    expires = datetime.utcnow() + timedelta(seconds=expires_in)
+
+    tok = {
+        'access_token': token['access_token'],
+        'refresh_token': token['refresh_token'],
+        'token_type': token['token_type'],
+        '_scopes': token['scope'],
+        'expires': expires.strftime('%Y-%m-%d %H:%M:%S'),
+        'client_id': request.client.client_id,
+    }
+    UsersTable(request.user.id).update_set(
+        oa_token=json.dumps(tok), oa_access_token=token['access_token'])
+    return tok
+
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
+    if 'client_id' in request.args:
+        session['oauth_flow_args'] = request.args
+
+    elif request.args.get('oa') == 'continue':
+        return redirect(url_for('authorize', **session['oauth_flow_args']))
+
     return render_template('index.html', client_id=app.config['LWA']['consumer_key'], form={})
+
+
+@login_manager.unauthorized_handler
+def unauthorized_callback():
+    return redirect(url_for('.index', **request.args))
 
 
 @app.route('/login')
@@ -87,9 +175,34 @@ def login():
 
 
 @app.route('/logout')
+@flask_login.login_required
 def logout():
     flask_login.logout_user()
     return redirect(url_for('index'))
+
+
+@app.route('/oauth/errors')
+@flask_login.login_required
+def oauth_errors():
+    return jsonify({'error': request.args['error']})
+
+
+@app.route('/oauth/authorize', methods=['GET', 'POST'])
+@flask_login.login_required
+@oauth.authorize_handler
+def authorize(*args, **kwargs):
+    if flask_login.current_user.data['yolo_endpoint'] is None or flask_login.current_user.data['client_endpoint'] is None:
+        session['linking'] = True
+        return redirect(url_for('index', **request.args))
+    return True
+
+
+@app.route('/oauth/token', methods=['POST'])
+@oauth.token_handler
+def access_token():
+    print(request.form)
+    print(request.args)
+    return None
 
 
 @app.route('/verify')
@@ -114,8 +227,7 @@ def verify():
     else:
         user_table.update_set(
             last_login=datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-    user = User()
-    user.id = profile_data['user_id']
+    user = User(profile_data['user_id'])
     flask_login.login_user(user)
     return jsonify({'status': 'success'})
 
@@ -181,6 +293,9 @@ def update():
     }
     UsersTable(flask_login.current_user.id).update_set(
         client_endpoint=client_stats)
+
+    if session['linking']:
+        return redirect(url_for('authorize', **session['oauth_flow_args']))
 
     return redirect(url_for('index'))
 
