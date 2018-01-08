@@ -70,8 +70,7 @@
     </div>
 
     <script type="text/javascript">
-        var site = 'http://' + window.location.host + '/login';
-        console.log(site);
+        var site = window.location.protocol + '//' + window.location.host + '{{ url_for("login") }}';
         document.getElementById('LoginWithAmazon').onclick = function() {
             options = {
                 scope: 'profile',

@@ -14,7 +14,7 @@
     <script>
         var accessToken = window.location.hash.slice(1).split('&')[0].split('access_token=')[1];
 
-        httpGetAsync('/verify?access_token=' + accessToken, function (xml) {
+        httpGetAsync('{{ url_for("verify") }}?access_token=' + accessToken, function (xml) {
             if (xml.status === 200) {
                 window.location.href = '/';
             } else {

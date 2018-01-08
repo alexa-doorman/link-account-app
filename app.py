@@ -4,7 +4,7 @@ import logging
 import json
 from decimal import Decimal
 
-from flask import Flask, request, make_response, jsonify, render_template, redirect
+from flask import Flask, request, make_response, jsonify, render_template, redirect, url_for
 import flask_login
 import requests
 
@@ -28,13 +28,24 @@ ch.setFormatter(formatter)
 # add ch to logger
 logger.addHandler(ch)
 
+
+# Try to load secret file
+if os.path.isfile(os.path.join(os.getcwd(), 'secret.py')):
+    import secret
+    os.environ['DOORMAN_LWA_KEY'] = secret.DOORMAN_LWA_KEY
+    os.environ['DOORMAN_LWA_SECRET'] = secret.DOORMAN_LWA_SECRET
+    os.environ['SECRET_KEY'] = secret.SECRET_KEY
+
+
 app = Flask(__name__)
 
 app.config['LWA'] = {
     'consumer_key': os.environ['DOORMAN_LWA_KEY'],
     'consumer_secret': os.environ['DOORMAN_LWA_SECRET']
 }
+app.config['DEBUG'] = os.environ.get('DEBUG') == 'True'
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'CHANGE_IN_PRODUCTION')
+app.config['SERVER_NAME'] = os.environ.get('SERVER_NAME', '0.0.0.0')
 
 login_manager = flask_login.LoginManager()
 login_manager.init_app(app)
@@ -50,6 +61,21 @@ def user_loader(amazon_id):
         return user
 
 
+@app.errorhandler(404)
+def page_not_found(error):
+    return make_response(jsonify({'status': 404,
+                                  'route': request.url,
+                                  'message': 'Not Found'}), 404)
+
+
+@app.errorhandler(500)
+def page_not_found(error):
+    logger.exception(str(error))
+    return make_response(jsonify({'status': 500,
+                                  'route': request.url,
+                                  'message': 'Internal Server Error'}), 500)
+
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     return render_template('index.html', client_id=app.config['LWA']['consumer_key'], form={})
@@ -63,7 +89,7 @@ def login():
 @app.route('/logout')
 def logout():
     flask_login.logout_user()
-    return redirect('/')
+    return redirect(url_for('index'))
 
 
 @app.route('/verify')
@@ -97,7 +123,7 @@ def verify():
 @app.route('/update', methods=['POST', 'GET'])
 def update():
     if request.method == 'GET':
-        return redirect('/')
+        return redirect(url_for('index'))
 
     yolo_endpoint = request.form['yolo_endpoint']
     client_endpoint = request.form['client_endpoint']
@@ -156,7 +182,7 @@ def update():
     UsersTable(flask_login.current_user.id).update_set(
         client_endpoint=client_stats)
 
-    return redirect('/')
+    return redirect(url_for('index'))
 
 
 @app.route('/report', methods=['POST'])
@@ -167,4 +193,5 @@ def report():
 
 
 if __name__ == '__main__':
-    app.run(debug=os.environ.get('DEBUG') == 'True', host='0.0.0.0', port=5003)
+    app.run(debug=os.environ.get('DEBUG') == 'True',
+            host=os.environ.get('SERVER_NAME', '0.0.0.0'), port=5003)
