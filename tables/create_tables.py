@@ -16,16 +16,12 @@ table = dynamodb.create_table(
         {
             'AttributeName': 'amazon_id',
             'AttributeType': 'S'
-        },
-        {
-            'AttributeName': 'client_endpoint',
-            'AttributeType': 'S'
-        },
+        }
 
     ],
     ProvisionedThroughput={
-        'ReadCapacityUnits': 5,
-        'WriteCapacityUnits': 5
+        'ReadCapacityUnits': 1,
+        'WriteCapacityUnits': 1
     }
 )
 

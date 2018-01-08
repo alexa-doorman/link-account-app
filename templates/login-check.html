@@ -1,0 +1,28 @@
+<!doctype <!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Checking your login information...</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+
+<body>
+    <p>Checking with Amazon...</p>
+    <script src="{{ url_for('static', filename='scripts/http.js') }}"></script>
+    <script>
+        var accessToken = window.location.hash.slice(1).split('&')[0].split('access_token=')[1];
+
+        httpGetAsync('/verify?access_token=' + accessToken, function (xml) {
+            if (xml.status === 200) {
+                window.location.href = '/';
+            } else {
+                console.log(response);
+                window.location.href = '/?error=lwa';
+            }
+        })
+    </script>
+</body>
+
+</html>
