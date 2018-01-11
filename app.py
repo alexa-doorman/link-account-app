@@ -159,7 +159,10 @@ def index():
         session['oauth_flow_args'] = request.args
 
     elif request.args.get('oa') == 'continue':
-        return redirect(url_for('authorize', **session['oauth_flow_args']))
+        if 'oauth_flow_args' in session:
+            return redirect(url_for('authorize', **session['oauth_flow_args']))
+        else:
+            return redirect(url_for('authorize'))
 
     return render_template('index.html', client_id=app.config['LWA']['consumer_key'], form={})
 
@@ -200,8 +203,6 @@ def authorize(*args, **kwargs):
 @app.route('/oauth/token', methods=['POST'])
 @oauth.token_handler
 def access_token():
-    print(request.form)
-    print(request.args)
     return None
 
 
@@ -295,7 +296,9 @@ def update():
         client_endpoint=client_stats)
 
     if session['linking']:
-        return redirect(url_for('authorize', **session['oauth_flow_args']))
+        if 'oauth_flow_args' not in session:
+            return render_template('/', error={'message': 'OAuthflow session arguments missing. Please try again.'})
+        return redirect(url_for('authorize', **session.get['oauth_flow_args']))
 
     return redirect(url_for('index'))
 

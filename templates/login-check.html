@@ -15,7 +15,7 @@
         var accessToken = window.location.hash.slice(1).split('&')[0].split('access_token=')[1];
         httpGetAsync('{{ url_for("verify") }}?access_token=' + accessToken, function (xml) {
             if (xml.status === 200) {
-                window.location.href = '/?oa=continue';
+                window.location.href = '/';
             } else {
                 console.log(response);
                 window.location.href = '/?error=lwa';
