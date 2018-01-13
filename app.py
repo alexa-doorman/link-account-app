@@ -255,7 +255,7 @@ def update():
             if not ping_yolo.json()['results']:
                 message = "YOLO API Object detection failed. Are you sure you are giving the right route (/detect)?"
                 raise ValueError(message)
-    except json.JSONDecodeError as e:
+    except ValueError as e:
         logger.error(str(e))
         UsersTable(flask_login.current_user.id).remove_from_item(
             'yolo_endpoint')
@@ -279,7 +279,7 @@ def update():
         if not ping_client.json()['camera']:
             message = "Streaming client camera is not opened!"
             raise IOError(message)
-    except json.JSONDecodeError as e:
+    except ValueError as e:
         logger.error(str(e))
         UsersTable(flask_login.current_user.id).remove_from_item(
             'client_endpoint')
