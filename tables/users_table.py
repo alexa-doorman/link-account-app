@@ -53,7 +53,6 @@ class UsersTable(object):
                                   'access_token': access_token})
 
     def put_error(self, error_message):
-        item = self.get()
         self.update_set(error_messages=json.dumps(error_message))
 
     def append_metadata(self, metadata):

@@ -45,7 +45,7 @@ app.config['LWA'] = {
     'consumer_secret': os.environ['DOORMAN_LWA_SECRET']
 }
 app.config['DEBUG'] = os.environ.get('DEBUG') == 'True'
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'CHANGE_IN_PRODUCTION')
+app.config['SECRET_KEY'] = os.environ['SECRET_KEY']
 if not app.debug:
     app.config['SERVER_NAME'] = os.environ.get('SERVER_NAME', '0.0.0.0')
 
@@ -184,6 +184,11 @@ def logout():
     return redirect(url_for('index'))
 
 
+@app.route('/privacy')
+def privacy_policy():
+    return render_template('privacy.html')
+
+
 @app.route('/oauth/errors')
 @flask_login.login_required
 def oauth_errors():
@@ -300,7 +305,6 @@ def update():
     if session['linking']:
         if 'oauth_flow_args' not in session:
             return render_template('/', error={'message': 'OAuthflow session arguments missing. Please try again.'})
-        print(session.get('oauth_flow_args'))
         return redirect(url_for('authorize', **(session.get('oauth_flow_args'))))
 
     return redirect(url_for('index'))
