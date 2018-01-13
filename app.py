@@ -194,7 +194,7 @@ def oauth_errors():
 @flask_login.login_required
 @oauth.authorize_handler
 def authorize(*args, **kwargs):
-    if flask_login.current_user.data['yolo_endpoint'] is None or flask_login.current_user.data['client_endpoint'] is None:
+    if flask_login.current_user.data.get('yolo_endpoint') is None or flask_login.current_user.data.get('client_endpoint') is None:
         session['linking'] = True
         return redirect(url_for('index', **request.args))
     return True
@@ -203,6 +203,8 @@ def authorize(*args, **kwargs):
 @app.route('/oauth/token', methods=['POST'])
 @oauth.token_handler
 def access_token():
+    logger.info("Token request from IP {0}".format(
+        request.headers.getlist("X-Forwarded-For")))
     return None
 
 
@@ -298,7 +300,8 @@ def update():
     if session['linking']:
         if 'oauth_flow_args' not in session:
             return render_template('/', error={'message': 'OAuthflow session arguments missing. Please try again.'})
-        return redirect(url_for('authorize', **session.get['oauth_flow_args']))
+        print(session.get('oauth_flow_args'))
+        return redirect(url_for('authorize', **(session.get('oauth_flow_args'))))
 
     return redirect(url_for('index'))
 
