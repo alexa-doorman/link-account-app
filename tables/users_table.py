@@ -1,7 +1,12 @@
 import json
+import logging
 
 import boto3
 from boto3.dynamodb.conditions import Key, Attr
+
+logging.getLogger('boto3').setLevel(logging.WARNING)
+logging.getLogger('botocore').setLevel(logging.WARNING)
+logging.getLogger('nose').setLevel(logging.WARNING)
 
 # Get the service resource.
 DYNAMODB = boto3.resource('dynamodb')

@@ -98,8 +98,7 @@ def load_grant(client_id, code):
                                   redirect_uri=grant['redirect_uri'],
                                   expires=datetime.strptime(
                                       grant['expires'], '%Y-%m-%d %H:%M:%S'),
-                                  _scopes=grant['_scopes']
-                                  )
+                                  _scopes=grant['_scopes'])
 
 
 @oauth.grantsetter
@@ -119,9 +118,9 @@ def save_grant(client_id, code, request, *args, **kwargs):
 
 
 @oauth.tokengetter
-def load_token(access_token=None):
-    if access_token:
-        info = UsersTable.get_token_by_access_id(access_token)
+def load_token(oa_access_token=None):
+    if oa_access_token:
+        info = UsersTable.get_token_by_access_id(oa_access_token)
         token = info['oa_token']
         if token:
             return oauth_client.Token(client_id=token['client_id'],
@@ -155,15 +154,18 @@ def save_token(token, request, *args, **kwargs):
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
+    print(session)
     if 'client_id' in request.args:
         session['oauth_flow_args'] = request.args
-
-    elif request.args.get('oa') == 'continue':
+    if (flask_login.current_user.is_authenticated and
+        flask_login.current_user.data.get('yolo_endpoint') and
+        flask_login.current_user.data.get('client_endpoint') and
+            session.get('linking')):
+        session['linking'] = False
         if 'oauth_flow_args' in session:
             return redirect(url_for('authorize', **session['oauth_flow_args']))
         else:
             return redirect(url_for('authorize'))
-
     return render_template('index.html', client_id=app.config['LWA']['consumer_key'], form={})
 
 
@@ -196,13 +198,16 @@ def oauth_errors():
 
 
 @app.route('/oauth/authorize', methods=['GET', 'POST'])
-@flask_login.login_required
 @oauth.authorize_handler
 def authorize(*args, **kwargs):
-    if flask_login.current_user.data.get('yolo_endpoint') is None or flask_login.current_user.data.get('client_endpoint') is None:
-        session['linking'] = True
+    session['linking'] = True
+    if flask_login.current_user.is_authenticated:
+        if (flask_login.current_user.data.get('yolo_endpoint') is None or
+                flask_login.current_user.data.get('client_endpoint') is None):
+            return redirect(url_for('index', **request.args))
+        return True
+    else:
         return redirect(url_for('index', **request.args))
-    return True
 
 
 @app.route('/oauth/token', methods=['POST'])
