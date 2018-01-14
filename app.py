@@ -222,6 +222,7 @@ def report():
 
 # avoid circular importing
 from oauth_views import *
+from ask_views import *
 
 
 if __name__ == '__main__':
