@@ -1,7 +1,7 @@
 import os
 
 
-class StaticOAuthClient(object):
+class StreamOAuthClient(object):
     client_id = os.environ['OA_CLIENT_ID']
     client_secret = os.environ['OA_CLIENT_SECRET']
 
@@ -9,6 +9,39 @@ class StaticOAuthClient(object):
     is_confidential = False
 
     _redirect_uris = os.environ['OA_REDIRECT_URIS']
+    _default_scopes = os.environ['OA_SCOPES']
+
+    @property
+    def client_type(self):
+        if self.is_confidential:
+            return 'confidential'
+        return 'public'
+
+    @property
+    def redirect_uris(self):
+        if self._redirect_uris:
+            return self._redirect_uris.split(',')
+        return []
+
+    @property
+    def default_redirect_uri(self):
+        return self.redirect_uris[0]
+
+    @property
+    def default_scopes(self):
+        if self._default_scopes:
+            return self._default_scopes.split()
+        return []
+
+
+class QueryOAuthClient(object):
+    client_id = os.environ['QUERY_CLIENT_ID']
+    client_secret = os.environ['QUERY_CLIENT_SECRET']
+
+    # public or confidential
+    is_confidential = False
+
+    _redirect_uris = os.environ['QUERY_REDIRECT_URIS']
     _default_scopes = os.environ['OA_SCOPES']
 
     @property

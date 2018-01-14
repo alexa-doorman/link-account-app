@@ -18,7 +18,6 @@ import requests
 
 from tables.users_table import UsersTable
 from tables.user import User
-import oauth_client
 
 logger = logging.getLogger('app')
 logger.setLevel(logging.INFO)
@@ -79,82 +78,8 @@ def internal_error(error):
                                   'message': 'Internal Server Error'}), 500)
 
 
-@oauth.clientgetter
-def load_client(client_id):
-    return oauth_client.StaticOAuthClient()
-
-
-@oauth.grantgetter
-def load_grant(client_id, code):
-    info = UsersTable.get_grant(client_id=client_id, code=code)
-    grant = info.get('oa_grant')
-    if grant:
-        grant = json.loads(grant)
-        return oauth_client.Grant(user_id=info['amazon_id'],
-                                  user=User(info['amazon_id']),
-                                  client_id=grant['client_id'],
-                                  client=oauth_client.StaticOAuthClient(),
-                                  code=grant['code'],
-                                  redirect_uri=grant['redirect_uri'],
-                                  expires=datetime.strptime(
-                                      grant['expires'], '%Y-%m-%d %H:%M:%S'),
-                                  _scopes=grant['_scopes'])
-
-
-@oauth.grantsetter
-def save_grant(client_id, code, request, *args, **kwargs):
-    # decide the expires time yourself
-    expires = datetime.utcnow() + timedelta(seconds=100)
-    grant = {
-        'client_id': client_id,
-        'code': code['code'],
-        'redirect_uri': request.redirect_uri,
-        '_scopes': ' '.join(request.scopes),
-        'expires': expires.strftime('%Y-%m-%d %H:%M:%S')
-    }
-    UsersTable(flask_login.current_user.id).update_set(
-        oa_grant=json.dumps(grant), client_id=client_id, code=code['code'])
-    return grant
-
-
-@oauth.tokengetter
-def load_token(oa_access_token=None):
-    if oa_access_token:
-        info = UsersTable.get_token_by_access_id(oa_access_token)
-        token = info['oa_token']
-        if token:
-            return oauth_client.Token(client_id=token['client_id'],
-                                      client=oauth_client.StaticOAuthClient(),
-                                      user_id=info['amazon_id'],
-                                      token_type=token['token_type'],
-                                      access_token=token['access_token'],
-                                      refresh_token=token['refresh_token'],
-                                      expires=datetime.strptime(
-                                          token['expires'], '%Y-%m-%d %H:%M:%S'),
-                                      _scopes=token['_scopes'])
-
-
-@oauth.tokensetter
-def save_token(token, request, *args, **kwargs):
-    expires_in = token.get('expires_in')
-    expires = datetime.utcnow() + timedelta(seconds=expires_in)
-
-    tok = {
-        'access_token': token['access_token'],
-        'refresh_token': token['refresh_token'],
-        'token_type': token['token_type'],
-        '_scopes': token['scope'],
-        'expires': expires.strftime('%Y-%m-%d %H:%M:%S'),
-        'client_id': request.client.client_id,
-    }
-    UsersTable(request.user.id).update_set(
-        oa_token=json.dumps(tok), oa_access_token=token['access_token'])
-    return tok
-
-
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    print(session)
     if 'client_id' in request.args:
         session['oauth_flow_args'] = request.args
     if (flask_login.current_user.is_authenticated and
@@ -189,33 +114,6 @@ def logout():
 @app.route('/privacy')
 def privacy_policy():
     return render_template('privacy.html')
-
-
-@app.route('/oauth/errors')
-@flask_login.login_required
-def oauth_errors():
-    return jsonify({'error': request.args['error']})
-
-
-@app.route('/oauth/authorize', methods=['GET', 'POST'])
-@oauth.authorize_handler
-def authorize(*args, **kwargs):
-    session['linking'] = True
-    if flask_login.current_user.is_authenticated:
-        if (flask_login.current_user.data.get('yolo_endpoint') is None or
-                flask_login.current_user.data.get('client_endpoint') is None):
-            return redirect(url_for('index', **request.args))
-        return True
-    else:
-        return redirect(url_for('index', **request.args))
-
-
-@app.route('/oauth/token', methods=['POST'])
-@oauth.token_handler
-def access_token():
-    logger.info("Token request from IP {0}".format(
-        request.headers.getlist("X-Forwarded-For")))
-    return None
 
 
 @app.route('/verify')
@@ -320,6 +218,10 @@ def report():
     payload = request.get_json()
     print('skill got', payload)
     return 'OK'
+
+
+# avoid circular importing
+from oauth_views import *
 
 
 if __name__ == '__main__':

@@ -27,16 +27,16 @@ class UsersTable(object):
         return self.table.get_item(Key={'amazon_id': self.amazon_id}).get('Item')
 
     @staticmethod
-    def get_grant(client_id, code):
-        user = USERS_TABLE.scan(FilterExpression=Attr('client_id').eq(
-            client_id) & Attr('code').eq(code)).get('Items')
+    def get_grant(code_key, code):
+        user = USERS_TABLE.scan(
+            FilterExpression=Attr(code_key).eq(code)).get('Items')
         if user:
             return user[0]
 
     @staticmethod
     def get_token_by_access_id(oa_access_token):
         user = USERS_TABLE.scan(FilterExpression=Attr(
-            'oa_access_token').eq(oa_access_token)).get('Items')
+            'query_token').eq(oa_access_token) | Attr('stream_token').eq(oa_access_token)).get('Items')
         if user:
             return user[0]
 
