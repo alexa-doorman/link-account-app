@@ -1,42 +1,53 @@
 import logging
 from functools import wraps
 
-from flask_ask import Ask, statement, question
+import flask_ask as ask
 
-from app import app, request, session
+from app import app
 
 
 logger = logging.getLogger()
 
-ask = Ask(app, '/alexa')
+ask_routes = ask.Ask(app, '/alexa')
 
 
-@ask.default_intent
+@app.errorhandler(400)
+def error_400(error):
+    print("400 ERROR")
+    logger.exception(request.data)
+
+
+@ask_routes.default_intent
 def default_intent():
     logger.info('intent not routed')
-    logger.info(request)
+    logger.info(ask.request)
 
 
 def link_account_response():
-    return statement('Please use the Alexa app to link your Doorman account').link_account_card()
+    return ask.statement('Please use the Alexa app to link your Doorman account').link_account_card()
 
 
 def has_access_token(f):
     # Adapted from [johnwheeler/flask-ask] Decorators for ask.intent (#176)
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not session.get('user', {}).get('accessToken'):
+        if not ask.session.get('user', {}).get('accessToken'):
             return link_account_response()
+        slots = ask.request.get('intent', {}).get('slots')
+        intent_name = ask.request.get('intent', {}).get('name')
+        if slots:
+            if intent_name in ask_routes._intent_mappings:
+                intent_map = {v: k for k,
+                              v in ask_routes._intent_mappings[intent_name].items()}
 
-        slots = request.get('intent', {}).get('slots')
-        for key, value in slots.iteritems():
-            kwargs.update({key: value.get('value')})
+            for key, value in slots.items():
+                kwargs.update({intent_map.get(key, key): value.get('value')})
 
         return f(*args, **kwargs)
     return decorated_function
 
 
-@ask.launch
+@ask_routes.launch
 @has_access_token
 def launch():
     card_title = 'Doorman - check who (or what) is at the door'
@@ -45,38 +56,42 @@ def launch():
             'Doorman Streamer Smart Home Skill to access your camera on a capable device. ')
     prompt = ('Would you like me to check what is ' +
               'at the door or would you like to get a link to view your web camera?')
-    return question(text + prompt).reprompt(prompt).simple_card(card_title, text)
+    return ask.question(text + prompt).reprompt(prompt).simple_card(card_title, text)
 
 
-@ask.intent('AMAZON.StopIntent')
+@ask_routes.intent('AMAZON.StopIntent')
 def stop_intent():
     if app.debug:
         logger.info('stop intent')
-    return statement("Stopped.")
+    return ask.statement("Stopped.")
 
 
-@ask.intent('AMAZON.CancelIntent')
+@ask_routes.intent('AMAZON.CancelIntent')
 def cancel_intent():
     if app.debug:
         logger.info('cancel intent')
-    return statement("Canceled.")
+    return ask.statement("Canceled.")
 
 
-@ask.intent('AMAZON.HelpIntent')
+@ask_routes.intent('AMAZON.HelpIntent')
 def help_intent():
     speech = ('Help intent')
-    return question(speech).simple_card('Help')
+    return ask.question(speech).simple_card('Help')
 
 
-@ask.intent('StreamIntent')
+@ask_routes.intent('StreamIntent', mapping={
+    'stream_query': 'StreamQuery'
+})
 @has_access_token
-def stream_intent():
+def stream_intent(stream_query):
     speech = ('Stream intent')
-    return statement(speech).simple_card('Help')
+    return ask.statement(speech).simple_card('Help')
 
 
-@ask.intent('CheckDoorIntent')
+@ask_routes.intent('CheckDoorIntent', mapping={
+    'check_door_query': 'CheckDoorQuery'
+})
 @has_access_token
-def check_door_intent():
+def check_door_intent(check_door_query):
     speech = ('check door intent')
-    return statement(speech).simple_card('Help')
+    return ask.statement(speech).simple_card('Help')
