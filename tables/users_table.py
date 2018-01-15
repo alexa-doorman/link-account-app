@@ -51,11 +51,12 @@ class UsersTable(object):
         if user:
             return user[0]['oa_token']
 
-    def create(self, name, email, access_token):
+    def create(self, name, email, access_token, upstream_key):
         self.table.put_item(Item={'amazon_id': self.amazon_id,
                                   'name': name,
                                   'email': email,
-                                  'access_token': access_token})
+                                  'access_token': access_token,
+                                  'uuid': upstream_key})
 
     def put_error(self, error_message):
         self.update_set(error_messages=json.dumps(error_message))

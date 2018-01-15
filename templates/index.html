@@ -32,23 +32,84 @@
                 <img src="{{ url_for('static', filename='img/logo-500.png') }}" alt="logo" width="50%"> 
             {% endif %}
             <br>
+            <button id="viewUpstreamBtn" style="margin-bottom: 15px; background: gray;">View UPSTREAM_SECRET_KEY</button>
+            <span id="upstreamKey"></span>            
+            <br>
             <form class="login-form" method="post" action="/update">
+                    <h4>YOLO Objection Detection API</h4>
                     {% if 'yolo_endpoint' in current_user.data %}
                         <span class="muted-message">&#128077; Linked YOLO API ({{current_user.data['yolo_endpoint']['elapsed']}}s)</span>
                     {% endif %}
                     <input name="yolo_endpoint" type="url" placeholder="Public YOLO Detection API URL http://<ip>:<port>/detect" required 
+                        id="yoloEndpointUrlInput"
                         value="{{ current_user.data.get('yolo_endpoint', {}).get('url') or form.get('yolo_endpoint', '') }}"/>
-
+                    <input id="yoloUsernameInput" style="display: none;" name="yolo_endpoint_username" type="text" placeholder="Username for YOLO API" />
+                    <input id="yoloUsernamePassword" style="display: none;" name="yolo_endpoint_password" type="password" placeholder="Password for YOLO API" />
+                    
+                    <h4>Stream Client API</h4>                    
                     {% if 'client_endpoint' in current_user.data %}
                         <span class="muted-message">&#128077; Linked Client API ({{current_user.data['client_endpoint']['elapsed']}}s)</span>
                     {% endif %}
                     <input name="client_endpoint" type="url" placeholder="Public Streaming Client URL http://<ip>:<port>" required 
+                        id="streamEndpointUrlInput"
                         value="{{ current_user.data.get('client_endpoint', {}).get('url') or form.get('client_endpoint', '')  }}"/> 
+                    <input id="streamUsernameInput" style="display: none;" name="client_endpoint_username" type="text" placeholder="Username for YOLO API" />
+                    <input id="streamUsernamePassword" style="display: none;" name="client_endpoint_password" type="password" placeholder="Password for YOLO API" />
                 <button>update</button>
             </form>
             <a href="/logout" class="btn">Logout</a>
         </div>
     </div>
+    <script type="text/javascript">
+        // logged in funcs
+        var yoloInput = document.getElementById('yoloEndpointUrlInput');
+        var yoloUsernameInput = document.getElementById('yoloUsernameInput');
+        var yoloPasswordInput = document.getElementById('yoloUsernamePassword');
+
+        var streamInput = document.getElementById('streamEndpointUrlInput');
+        var streamUsernameInput = document.getElementById('streamUsernameInput');
+        var streamPasswordInput = document.getElementById('streamUsernamePassword');
+
+        var originalYoloURL = yoloInput.value;
+        var originalStreamURL = streamInput.value;
+
+        document.getElementById('viewUpstreamBtn').addEventListener('click', function(){ 
+            document.getElementById('upstreamKey').textContent = "{{ current_user.data.uuid }}"; 
+        });
+
+        yoloInput.addEventListener('input', function(e) {
+            if (yoloInput.value !== originalYoloURL) {
+                yoloUsernameInput.style['display'] = 'block';
+                yoloUsernameInput.required = true;
+
+                yoloPasswordInput.style['display'] = 'block';        
+                yoloPasswordInput.required = true;
+            } else {
+                yoloUsernameInput.style['display'] = 'none';
+                yoloUsernameInput.required = false;
+
+                yoloPasswordInput.style['display'] = 'none';    
+                yoloPasswordInput.required = false; 
+            }
+        });
+
+        streamInput.addEventListener('input', function(e) {
+            if (streamInput.value !== originalStreamURL) {
+                streamUsernameInput.style['display'] = 'block';
+                streamUsernameInput.required = true;
+
+                streamPasswordInput.style['display'] = 'block';        
+                streamPasswordInput.required = true;
+            } else {
+                streamUsernameInput.style['display'] = 'none';
+                streamUsernameInput.required = false;
+
+                streamPasswordInput.style['display'] = 'none';    
+                streamPasswordInput.required = false; 
+            }
+        });
+    </script>
+
     {% else %}
     <div class="login-page">
         {% if error %}
@@ -95,6 +156,7 @@
             d.getElementById('amazon-root').appendChild(a);
         })(document);
     </script>
+
     {% endif %}
 
 

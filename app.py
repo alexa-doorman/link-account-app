@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import logging
 import json
 from decimal import Decimal
+import uuid
 
 from os.path import join, dirname
 from dotenv import load_dotenv
@@ -132,7 +133,8 @@ def verify():
     if user_table.get() is None:
         user_table.create(name=profile_data['name'],
                           email=profile_data['email'],
-                          access_token=request.args['access_token'])
+                          access_token=request.args['access_token'],
+                          upstream_key=uuid.uuid4().hex)
         user_table.append_metadata({'message': 'new link',
                                     'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')})
     else:
