@@ -168,6 +168,6 @@ def authorize(*args, **kwargs):
 @app.route('/oauth/token', methods=['POST'])
 @oauth.token_handler
 def access_token():
-    logger.info("Token request from IP {0}".format(
+    logger.info("Token request from IP %s", str(
         request.headers.getlist("X-Forwarded-For")))
     return None

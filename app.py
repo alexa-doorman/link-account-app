@@ -160,13 +160,17 @@ def update():
         logger.info('Hitting %s' % yolo_endpoint)
         with open(os.path.join(os.getcwd(), 'static/img/sample_person.jpg'), 'rb') as jpg:
             ping_yolo = requests.post(
-                yolo_endpoint, timeout=6, files={'image': jpg})
+                yolo_endpoint,
+                timeout=6,
+                files={'image': jpg},
+                auth=(request.form['yolo_endpoint_username'],
+                      request.form['yolo_endpoint_password']))
             # make sure that objects were detected -
             if not ping_yolo.json()['results']:
                 message = "YOLO API Object detection failed. Are you sure you are giving the right route (/detect)?"
                 raise ValueError(message)
-    except ValueError as e:
-        logger.error(str(e))
+    except ValueError as ve:
+        logger.error(str(ve))
         UsersTable(flask_login.current_user.id).remove_from_item(
             'yolo_endpoint')
         return render_template('index.html', error={'message': decode_error.format(yolo_endpoint)}, form=request.form)
@@ -184,13 +188,16 @@ def update():
         yolo_endpoint=yolo_stats)
 
     try:
-        logger.info('Hitting %s' % client_endpoint)
-        ping_client = requests.get(client_endpoint, timeout=5)
+        logger.info('Hitting %s', client_endpoint)
+        ping_client = requests.get(client_endpoint,
+                                   timeout=5,
+                                   auth=(request.form['client_endpoint_username'],
+                                         request.form['client_endpoint_password']))
         if not ping_client.json()['camera']:
             message = "Streaming client camera is not opened!"
             raise IOError(message)
-    except ValueError as e:
-        logger.error(str(e))
+    except ValueError as ve:
+        logger.error(str(ve))
         UsersTable(flask_login.current_user.id).remove_from_item(
             'client_endpoint')
         return render_template('index.html', error={'message': decode_error.format(client_endpoint)}, form=request.form)
@@ -199,6 +206,23 @@ def update():
         UsersTable(flask_login.current_user.id).remove_from_item(
             'client_endpoint')
         return render_template('index.html', error={'message': message or failed_reach_message.format(client_endpoint)}, form=request.form)
+
+    # Now verify secret-key is set properly
+    try:
+        logger.info('Checking UPSTREAM_SECRET_KEY is correct')
+        if client_endpoint.endswith('/'):
+            verify_endpoint = '{0}{1}'.format(client_endpoint, 'verify-key')
+        else:
+            verify_endpoint = '{0}/{1}'.format(client_endpoint, '/verify-key')
+        up_key_request = requests.get(verify_endpoint,
+                                      auth=(request.form['client_endpoint_username'],
+                                            request.form['client_endpoint_password']),
+                                      json={'UPSTREAM_REPORT_KEY': flask_login.current_user.data['upstream_key']})
+        if up_key_request.status_code != 200:
+            return render_template('index.html', error={'message': failed_reach_message.format(verify_endpoint)}, form=request.form)
+    except Exception as e:
+        logger.error(str(e))
+        return render_template('index.html', error={'message': failed_reach_message.format(verify_endpoint)}, form=request.form)
 
     client_stats = {
         'url': client_endpoint,
