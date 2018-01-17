@@ -141,6 +141,7 @@ def check_door_intent(check_door_query):
                 speech_buf = ["I have found a few things: "]
                 for obj_label, obj_count in stuff.items():
                     speech_buf.append('{0} {1},'.format(obj_count, obj_label))
+                speech_buf[-1] = speech_buf[-1].replace(' ', 'and ').replace(',', '.')
                 speech = ' '.join(speech_buf)
                 return ask.statement(speech).simple_card('You have guests/items at your front door!', speech)
         else:
