@@ -160,6 +160,8 @@ def authorize(*args, **kwargs):
         if (flask_login.current_user.data.get('yolo_endpoint') is None or
                 flask_login.current_user.data.get('client_endpoint') is None):
             return redirect(url_for('index', **request.args))
+        session['linking'] = False
+        session['oauth_flow_args'] = None
         return True
     else:
         return redirect(url_for('index', **request.args))

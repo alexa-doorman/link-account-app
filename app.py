@@ -80,17 +80,15 @@ def internal_error(error):
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
+    logger.info(session)
     if 'client_id' in request.args:
         session['oauth_flow_args'] = request.args
     if (flask_login.current_user.is_authenticated and
         flask_login.current_user.data.get('yolo_endpoint') and
         flask_login.current_user.data.get('client_endpoint') and
-            session.get('linking')):
-        session['linking'] = False
-        if 'oauth_flow_args' in session:
-            return redirect(url_for('authorize', **session['oauth_flow_args']))
-        else:
-            return redirect(url_for('authorize'))
+            session.get('linking') and
+            session.get('oauth_flow_args')):
+        return redirect(url_for('authorize', **session['oauth_flow_args']))
     return render_template('index.html', client_id=app.config['LWA']['consumer_key'], form={})
 
 
