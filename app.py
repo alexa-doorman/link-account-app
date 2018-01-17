@@ -20,22 +20,21 @@ import requests
 from tables.users_table import UsersTable
 from tables.user import User
 
-logger = logging.getLogger('app')
+log_formatter = logging.Formatter(
+    "%(asctime)s [ %(threadName)-12.12s ] [ %(levelname)-5.5s ]  %(message)s")
+logger = logging.getLogger()
+
+if not logger.handlers:
+    file_handler = logging.FileHandler("warn.log")
+    file_handler.setFormatter(log_formatter)
+    logger.addHandler(file_handler)
+
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(log_formatter)
+    logger.addHandler(console_handler)
+
 logger.setLevel(logging.INFO)
-
-# create console handler and set level to debug
-ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
-
-# create formatter
-formatter = logging.Formatter(
-    '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-# add formatter to ch
-ch.setFormatter(formatter)
-
-# add ch to logger
-logger.addHandler(ch)
 
 
 app = Flask(__name__)
@@ -152,86 +151,122 @@ def update():
 
     yolo_endpoint = request.form['yolo_endpoint']
     client_endpoint = request.form['client_endpoint']
-    failed_reach_message = "Failed to reach {0}"
+    failed_reach_message = "{0} Failed to reach {1}"
     message = None
-    decode_error = "Failed to decode JSON for {0}"
+    decode_error = "{0} Failed to decode JSON for {1}"
+    if request.form['change_yolo_endpoint'] == 'true':
+        try:
+            logger.info('Hitting %s', yolo_endpoint)
+            with open(os.path.join(os.getcwd(), 'static/img/sample_person.jpg'), 'rb') as jpg:
+                ping_yolo = requests.post(
+                    yolo_endpoint,
+                    auth=(request.form.get('yolo_endpoint_username'),
+                          request.form.get('yolo_endpoint_password')),
+                    files={'image': jpg})
+                if ping_yolo.status_code != 200:
+                    message = 'YOLO ENDPOINT: {0} failed with status code {1}'.format(
+                        yolo_endpoint, ping_yolo.status_code)
+                    raise Exception()
+                # make sure that objects were detected -
+                if not ping_yolo.json()['results']:
+                    message = "YOLO API Object detection failed. Are you sure you are giving the right route (/detect)?"
+                    raise ValueError(message)
+        except ValueError as ve:
+            logger.error('ValueError with %s detected', yolo_endpoint)
+            logger.error(ping_yolo.text)
+            UsersTable(flask_login.current_user.id).remove_from_item(
+                'yolo_endpoint')
+            return render_template('index.html',
+                                   error={'message': decode_error.format(
+                                       'YOLO', yolo_endpoint)},
+                                   form=request.form)
+        except Exception as e:
+            logger.error('Exception with %s detected', yolo_endpoint)
+            logger.error(str(e))
+            UsersTable(flask_login.current_user.id).remove_from_item(
+                'yolo_endpoint')
+            return render_template('index.html',
+                                   error={'message': message or failed_reach_message.format(
+                                       'YOLO', yolo_endpoint)},
+                                   form=request.form)
 
-    try:
-        logger.info('Hitting %s' % yolo_endpoint)
-        with open(os.path.join(os.getcwd(), 'static/img/sample_person.jpg'), 'rb') as jpg:
-            ping_yolo = requests.post(
-                yolo_endpoint,
-                timeout=6,
-                files={'image': jpg},
-                auth=(request.form['yolo_endpoint_username'],
-                      request.form['yolo_endpoint_password']))
-            # make sure that objects were detected -
-            if not ping_yolo.json()['results']:
-                message = "YOLO API Object detection failed. Are you sure you are giving the right route (/detect)?"
-                raise ValueError(message)
-    except ValueError as ve:
-        logger.error(str(ve))
-        UsersTable(flask_login.current_user.id).remove_from_item(
-            'yolo_endpoint')
-        return render_template('index.html', error={'message': decode_error.format(yolo_endpoint)}, form=request.form)
-    except Exception as e:
-        logger.error(str(e))
-        UsersTable(flask_login.current_user.id).remove_from_item(
-            'yolo_endpoint')
-        return render_template('index.html', error={'message': message or failed_reach_message.format(yolo_endpoint)}, form=request.form)
+        yolo_stats = {
+            'url': yolo_endpoint,
+            'elapsed': Decimal(str(ping_yolo.elapsed.total_seconds())),
+            'username': request.form['yolo_endpoint_username'],
+            'password': request.form['yolo_endpoint_password']
+        }
+        UsersTable(flask_login.current_user.id).update_set(
+            yolo_endpoint=yolo_stats)
 
-    yolo_stats = {
-        'url': yolo_endpoint,
-        'elapsed': Decimal(str(ping_yolo.elapsed.total_seconds()))
-    }
-    UsersTable(flask_login.current_user.id).update_set(
-        yolo_endpoint=yolo_stats)
+    if request.form['change_client_endpoint'] == 'true':
+        try:
+            logger.info('Hitting %s', client_endpoint)
+            ping_client = requests.get(client_endpoint,
+                                       auth=(request.form.get('client_endpoint_username'),
+                                             request.form.get('client_endpoint_password')))
+            if ping_client.status_code != 200:
+                message = '{0} failed with status code {1}'.format(client_endpoint,
+                                                                   ping_client.status_code)
+                raise Exception()
 
-    try:
-        logger.info('Hitting %s', client_endpoint)
-        ping_client = requests.get(client_endpoint,
-                                   timeout=5,
-                                   auth=(request.form['client_endpoint_username'],
-                                         request.form['client_endpoint_password']))
-        if not ping_client.json()['camera']:
-            message = "Streaming client camera is not opened!"
-            raise IOError(message)
-    except ValueError as ve:
-        logger.error(str(ve))
-        UsersTable(flask_login.current_user.id).remove_from_item(
-            'client_endpoint')
-        return render_template('index.html', error={'message': decode_error.format(client_endpoint)}, form=request.form)
-    except Exception as e:
-        logger.error(str(e))
-        UsersTable(flask_login.current_user.id).remove_from_item(
-            'client_endpoint')
-        return render_template('index.html', error={'message': message or failed_reach_message.format(client_endpoint)}, form=request.form)
+            if not ping_client.json()['camera']:
+                message = "Streaming client camera is not opened!"
+                raise IOError(message)
+        except ValueError as ve:
+            logger.error('ValueError with %s detected', client_endpoint)
+            logger.error(str(ve))
+            UsersTable(flask_login.current_user.id).remove_from_item(
+                'client_endpoint')
+            return render_template('index.html',
+                                   error={'message': decode_error.format(
+                                       'CLIENT', client_endpoint)},
+                                   form=request.form)
+        except Exception as e:
+            logger.error(str(e))
+            UsersTable(flask_login.current_user.id).remove_from_item(
+                'client_endpoint')
+            return render_template('index.html',
+                                   error={'message': message or failed_reach_message.format(
+                                       'STREAM CLIENT', client_endpoint)},
+                                   form=request.form)
 
-    # Now verify secret-key is set properly
-    try:
-        logger.info('Checking UPSTREAM_SECRET_KEY is correct')
-        if client_endpoint.endswith('/'):
-            verify_endpoint = '{0}{1}'.format(client_endpoint, 'verify-key')
-        else:
-            verify_endpoint = '{0}/{1}'.format(client_endpoint, '/verify-key')
-        up_key_request = requests.get(verify_endpoint,
-                                      auth=(request.form['client_endpoint_username'],
-                                            request.form['client_endpoint_password']),
-                                      json={'UPSTREAM_REPORT_KEY': flask_login.current_user.data['upstream_key']})
-        if up_key_request.status_code != 200:
-            return render_template('index.html', error={'message': failed_reach_message.format(verify_endpoint)}, form=request.form)
-    except Exception as e:
-        logger.error(str(e))
-        return render_template('index.html', error={'message': failed_reach_message.format(verify_endpoint)}, form=request.form)
+        # Now verify secret-key is set properly
+        try:
+            logger.info('Checking UPSTREAM_SECRET_KEY is correct')
+            if client_endpoint.endswith('/'):
+                verify_endpoint = '{0}{1}'.format(
+                    client_endpoint, 'verify-key')
+            else:
+                verify_endpoint = '{0}/{1}'.format(
+                    client_endpoint, 'verify-key')
+            up_key_request = requests.get(verify_endpoint,
+                                          timeout=6,
+                                          auth=(request.form['client_endpoint_username'],
+                                                request.form['client_endpoint_password']),
+                                          json={'UPSTREAM_REPORT_KEY': flask_login.current_user.data['uuid']})
+            if up_key_request.status_code != 200:
+                return render_template('index.html',
+                                       error={'message': failed_reach_message.format(
+                                           'CLIENT VERIFY', verify_endpoint)},
+                                       form=request.form)
+        except Exception as e:
+            logger.error(str(e))
+            return render_template('index.html',
+                                   error={'message': failed_reach_message.format(
+                                       'CLIENT VERIFY', verify_endpoint)},
+                                   form=request.form)
 
-    client_stats = {
-        'url': client_endpoint,
-        'elapsed': Decimal(str(ping_client.elapsed.total_seconds()))
-    }
-    UsersTable(flask_login.current_user.id).update_set(
-        client_endpoint=client_stats)
+        client_stats = {
+            'url': client_endpoint,
+            'elapsed': Decimal(str(ping_client.elapsed.total_seconds())),
+            'username': request.form['client_endpoint_username'],
+            'password': request.form['client_endpoint_password']
+        }
+        UsersTable(flask_login.current_user.id).update_set(
+            client_endpoint=client_stats)
 
-    if session['linking']:
+    if session.get('linking'):
         if 'oauth_flow_args' not in session:
             return render_template('/', error={'message': 'OAuthflow session arguments missing. Please try again.'})
         return redirect(url_for('authorize', **(session.get('oauth_flow_args'))))
@@ -253,4 +288,5 @@ from ask_views import *
 
 if __name__ == '__main__':
     app.run(debug=os.environ.get('DEBUG') == 'True',
-            host=os.environ.get('SERVER_NAME', '0.0.0.0'), port=5003)
+            host=os.environ.get('SERVER_NAME', '0.0.0.0'),
+            port=5003)

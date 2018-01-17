@@ -35,43 +35,86 @@
             <button id="viewUpstreamBtn" style="margin-bottom: 15px; background: gray;">View UPSTREAM_SECRET_KEY</button>
             <span id="upstreamKey"></span>            
             <br>
-            <form class="login-form" method="post" action="/update">
+            <form class="login-form" method="post" action="/update" id="updateEndpoints">
                     <h4>YOLO Objection Detection API</h4>
                     {% if 'yolo_endpoint' in current_user.data %}
                         <span class="muted-message">&#128077; Linked YOLO API ({{current_user.data['yolo_endpoint']['elapsed']}}s)</span>
+                    {% else %}
+                        <span class="muted-message">http://&lt;ip&gt;:&lt;port&gt;/detect (port default is <strong>5001</strong>)</span>                
                     {% endif %}
                     <input name="yolo_endpoint" type="url" placeholder="Public YOLO Detection API URL http://<ip>:<port>/detect" required 
                         id="yoloEndpointUrlInput"
                         value="{{ current_user.data.get('yolo_endpoint', {}).get('url') or form.get('yolo_endpoint', '') }}"/>
-                    <input id="yoloUsernameInput" style="display: none;" name="yolo_endpoint_username" type="text" placeholder="Username for YOLO API" />
-                    <input id="yoloUsernamePassword" style="display: none;" name="yolo_endpoint_password" type="password" placeholder="Password for YOLO API" />
-                    
+                    <input id="yoloUsernameInput" style="display: none;" name="yolo_endpoint_username" type="text" placeholder="Username for YOLO API" 
+                        value="{{ current_user.data.get('yolo_endpoint', {}).get('username') or ''  }}" />
+                    <input id="yoloUsernamePassword" style="display: none;" name="yolo_endpoint_password" type="password" placeholder="Password for YOLO API" 
+                        value="{{ current_user.data.get('yolo_endpoint', {}).get('password') or ''  }}" />
+                    <input id="yoloChange" type="hidden" name="change_yolo_endpoint">
                     <h4>Stream Client API</h4>                    
                     {% if 'client_endpoint' in current_user.data %}
                         <span class="muted-message">&#128077; Linked Client API ({{current_user.data['client_endpoint']['elapsed']}}s)</span>
+                    {% else %}
+                        <span class="muted-message">http://&lt;ip&gt;:&lt;port&gt; (port default is <strong>5000</strong>)</span>                
                     {% endif %}
                     <input name="client_endpoint" type="url" placeholder="Public Streaming Client URL http://<ip>:<port>" required 
                         id="streamEndpointUrlInput"
                         value="{{ current_user.data.get('client_endpoint', {}).get('url') or form.get('client_endpoint', '')  }}"/> 
-                    <input id="streamUsernameInput" style="display: none;" name="client_endpoint_username" type="text" placeholder="Username for YOLO API" />
-                    <input id="streamUsernamePassword" style="display: none;" name="client_endpoint_password" type="password" placeholder="Password for YOLO API" />
-                <button>update</button>
+                    <input id="streamUsernameInput" style="display: none;" name="client_endpoint_username" type="text" placeholder="Username for Streaming Client API" 
+                        value="{{ current_user.data.get('client_endpoint', {}).get('username') or ''  }}" />
+                    <input id="streamUsernamePassword" style="display: none;" name="client_endpoint_password" type="password" placeholder="Password for Streaming Client API" 
+                        value="{{ current_user.data.get('client_endpoint', {}).get('password') or ''  }}"  />
+                    <input id="streamChange" type="hidden" name="change_client_endpoint">
+                    
+                <input id="updateEndpointsBtn" type="submit" value="Update" class="green-button" />
             </form>
             <a href="/logout" class="btn">Logout</a>
         </div>
     </div>
     <script type="text/javascript">
         // logged in funcs
+        var updateEndpointsForm = document.getElementById('updateEndpoints');
+        var updateEndpointsBtn = document.getElementById('updateEndpointsBtn');
+
         var yoloInput = document.getElementById('yoloEndpointUrlInput');
         var yoloUsernameInput = document.getElementById('yoloUsernameInput');
         var yoloPasswordInput = document.getElementById('yoloUsernamePassword');
+        var yoloChange = document.getElementById('yoloChange');
 
         var streamInput = document.getElementById('streamEndpointUrlInput');
         var streamUsernameInput = document.getElementById('streamUsernameInput');
         var streamPasswordInput = document.getElementById('streamUsernamePassword');
+        var streamChange = document.getElementById('streamChange');
 
-        var originalYoloURL = yoloInput.value;
-        var originalStreamURL = streamInput.value;
+        var handleYoloNotOriginal = function() {
+            yoloUsernameInput.style['display'] = 'block';
+            yoloUsernameInput.required = true;
+
+            yoloPasswordInput.style['display'] = 'block';        
+            yoloPasswordInput.required = true;
+
+            yoloChange.value = true;            
+        }
+
+        var handleClientNotOriginal = function() {
+            streamUsernameInput.style['display'] = 'block';
+            streamUsernameInput.required = true;
+
+            streamPasswordInput.style['display'] = 'block';        
+            streamPasswordInput.required = true;
+
+            streamChange.value = true;
+        }
+
+        {% if error %}
+            var originalYoloURL = 'ERROR';
+            var originalStreamURL = 'ERROR';
+            handleYoloNotOriginal();
+            handleClientNotOriginal();
+            
+        {% else %}
+            var originalYoloURL = yoloInput.value;
+            var originalStreamURL = streamInput.value;
+        {% endif %}
 
         document.getElementById('viewUpstreamBtn').addEventListener('click', function(){ 
             document.getElementById('upstreamKey').textContent = "{{ current_user.data.uuid }}"; 
@@ -79,34 +122,41 @@
 
         yoloInput.addEventListener('input', function(e) {
             if (yoloInput.value !== originalYoloURL) {
-                yoloUsernameInput.style['display'] = 'block';
-                yoloUsernameInput.required = true;
-
-                yoloPasswordInput.style['display'] = 'block';        
-                yoloPasswordInput.required = true;
+                handleYoloNotOriginal();
             } else {
                 yoloUsernameInput.style['display'] = 'none';
                 yoloUsernameInput.required = false;
 
                 yoloPasswordInput.style['display'] = 'none';    
                 yoloPasswordInput.required = false; 
+                
+                yoloChange.value = false;                
             }
         });
 
         streamInput.addEventListener('input', function(e) {
             if (streamInput.value !== originalStreamURL) {
-                streamUsernameInput.style['display'] = 'block';
-                streamUsernameInput.required = true;
-
-                streamPasswordInput.style['display'] = 'block';        
-                streamPasswordInput.required = true;
+                handleClientNotOriginal();
             } else {
                 streamUsernameInput.style['display'] = 'none';
                 streamUsernameInput.required = false;
 
                 streamPasswordInput.style['display'] = 'none';    
                 streamPasswordInput.required = false; 
+
+                streamChange.value = false;                
             }
+        });
+
+        updateEndpointsForm.addEventListener('submit', function(e){
+            e.preventDefault();
+            updateEndpointsBtn.value = 'Update in Progress';
+
+            updateEndpointsBtn.disabled = true;
+            updateEndpointsBtn.style['background'] = '#d3ffd5';
+
+            updateEndpointsForm.submit();
+            return true;
         });
     </script>
 
