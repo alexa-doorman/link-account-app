@@ -2,8 +2,11 @@ import logging
 from functools import wraps
 
 import flask_ask as ask
+import requests
 
 from app import app
+
+from tables.users_table import UsersTable
 
 TUTORIAL_LINK = 'https://www.hackster.io/exp0nge/alexa-doorman-who-is-at-my-door-22b251'
 
@@ -84,9 +87,15 @@ def help_intent():
 })
 @has_access_token
 def stream_intent(stream_query):
+    user = UsersTable.get_token_by_access_id(
+        ask.session['user']['accessToken'])
     speech = ('Visit the Alexa app to get the stream URL for your smart camera.')
-    card_text = 'Visit {0}'.format('http://google.com')
+    card_text = 'Visit {0}'.format(user['client_endpoint']['url'])
     return ask.statement(speech).simple_card('Smart Camera Streaming Link', card_text)
+
+
+def make_error_statement(message):
+    return ask.statement(message).simple_card('Error occured!', message)
 
 
 @ask_routes.intent('CheckDoorIntent', mapping={
@@ -94,6 +103,50 @@ def stream_intent(stream_query):
 })
 @has_access_token
 def check_door_intent(check_door_query):
-    speech = ('check door intent')
-    card_text = 'found x'
-    return ask.statement(speech).simple_card('Checked Door', card_text)
+    user = UsersTable.get_token_by_access_id(
+        ask.session['user']['accessToken'])
+
+    try:
+        objects_request = requests.get(
+            '{0}/process'.format(user['client_endpoint']['url']),
+            auth=(user['client_endpoint']['username'], user['client_endpoint']['password']))
+        if objects_request.status_code != 200:
+            return make_error_statement('An error occurred with your stream client process ' +
+                                        'endpoint which returned {0}'.format(
+                                            objects_request.status_code))
+
+        data = objects_request.json()
+
+        if data['results']:
+            # sort the items from highest confidence to lowest
+            data['results'].sort(
+                key=lambda item: item['confidence'], reverse=True)
+            if len(data['results']) == 1:
+                speech = "I found a {0} at your door which I am {1}%% confident about.".format(
+                    data['results'][0]['label'], int(data['results'][0]['confidence'] / 100))
+                return ask.statement(speech)
+            else:
+                stuff = {}
+                max_unique_items = 3
+                current_item_count = 0
+                for obj in data['results']:
+                    if stuff.get(obj['label']):
+                        stuff[obj['label']] += 1
+                    else:
+                        if current_item_count >= max_unique_items:
+                            break
+                        stuff[obj['label']] = 1
+                        current_item_count += 1
+                # return the top 3 objects
+                speech_buf = ["I have found a few things: "]
+                for obj_label, obj_count in stuff.items():
+                    speech_buf.append('{0} {1},'.format(obj_count, obj_label))
+                speech = ' '.join(speech_buf)
+                return ask.statement(speech).simple_card('You have guests/items at your front door!', speech)
+        else:
+            speech = "I couldn't find anything at your door."
+            return ask.statement(speech).simple_card('Checked Door', speech)
+
+    except ValueError as e:
+        logger.exception("Error occured")
+        return make_error_statement('An error occured with your stream client endpoint with the error {0}'.format(str(e)))
