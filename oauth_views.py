@@ -146,13 +146,13 @@ def load_token(oa_access_token=None):
                                           _scopes=token['_scopes'])
 
 
-@app.route('/oauth/errors')
+@app.route('/oauth/errors/')
 @flask_login.login_required
 def oauth_errors():
     return jsonify({'error': request.args['error']})
 
 
-@app.route('/oauth/authorize', methods=['GET', 'POST'])
+@app.route('/oauth/authorize/', methods=['GET', 'POST'])
 @oauth.authorize_handler
 def authorize(*args, **kwargs):
     session['linking'] = True
@@ -167,7 +167,7 @@ def authorize(*args, **kwargs):
         return redirect(url_for('index', **request.args))
 
 
-@app.route('/oauth/token', methods=['POST'])
+@app.route('/oauth/token/', methods=['POST'])
 @oauth.token_handler
 def access_token():
     logger.info("Token request from IP %s", str(

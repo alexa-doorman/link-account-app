@@ -35,7 +35,7 @@
             <button id="viewUpstreamBtn" style="margin-bottom: 15px; background: gray;">View UPSTREAM_SECRET_KEY</button>
             <span id="upstreamKey"></span>            
             <br>
-            <form class="login-form" method="post" action="/update" id="updateEndpoints">
+            <form class="login-form" method="post" action="/update/" id="updateEndpoints">
                     <h4>YOLO Objection Detection API</h4>
                     {% if 'yolo_endpoint' in current_user.data %}
                         <span class="muted-message">&#128077; Linked YOLO API ({{current_user.data['yolo_endpoint']['elapsed']}}s)</span>

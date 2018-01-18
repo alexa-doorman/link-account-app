@@ -45,7 +45,6 @@ app.config['LWA'] = {
 }
 app.config['DEBUG'] = os.environ.get('DEBUG') == 'True'
 app.config['SECRET_KEY'] = os.environ['SECRET_KEY']
-app.url_map.strict_slashes = False
 
 if not app.debug:
     app.config['SERVER_NAME'] = os.environ.get('SERVER_NAME', '0.0.0.0')
@@ -54,14 +53,6 @@ login_manager = flask_login.LoginManager()
 login_manager.init_app(app)
 oauth = OAuth2Provider()
 oauth.init_app(app)
-
-
-@app.before_request
-def clear_trailing():
-    rp = request.path
-    if rp != '/' and rp.endswith('/'):
-        return redirect(rp[:-1])
-
 
 @login_manager.user_loader
 def user_loader(amazon_id):
@@ -106,24 +97,24 @@ def unauthorized_callback():
     return redirect(url_for('.index', **request.args))
 
 
-@app.route('/login')
+@app.route('/login/')
 def login():
     return render_template('login-check.html')
 
 
-@app.route('/logout')
+@app.route('/logout/')
 @flask_login.login_required
 def logout():
     flask_login.logout_user()
     return redirect(url_for('index'))
 
 
-@app.route('/privacy')
+@app.route('/privacy/')
 def privacy_policy():
     return render_template('privacy.html')
 
 
-@app.route('/verify')
+@app.route('/verify/')
 def verify():
     if 'access_token' not in request.args:
         return make_response(jsonify({'status': 'error', 'message': 'access_token missing!'}), 400)
@@ -151,7 +142,7 @@ def verify():
     return jsonify({'status': 'success'})
 
 
-@app.route('/update', methods=['POST', 'GET'])
+@app.route('/update/', methods=['POST', 'GET'])
 def update():
     if request.method == 'GET':
         return redirect(url_for('index'))
@@ -281,7 +272,7 @@ def update():
     return redirect(url_for('index'))
 
 
-@app.route('/report', methods=['POST'])
+@app.route('/report/', methods=['POST'])
 def report():
     payload = request.get_json()
     print('skill got', payload)
