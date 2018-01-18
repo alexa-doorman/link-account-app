@@ -12,7 +12,7 @@ TUTORIAL_LINK = 'https://www.hackster.io/exp0nge/alexa-doorman-who-is-at-my-door
 
 logger = logging.getLogger()
 
-ask_routes = ask.Ask(app, '/alexa')
+ask_routes = ask.Ask(app, '/alexa/')
 
 
 @ask_routes.default_intent
@@ -89,7 +89,7 @@ def help_intent():
 def stream_intent(stream_query):
     user = UsersTable.get_token_by_access_id(
         ask.session['user']['accessToken'])
-    speech = ('Visit the Alexa app to get the stream URL for your smart camera.' +
+    speech = ('Visit the Alexa app to get the stream URL for your smart camera. ' +
               'Remember to use your login credentials for the URL when prompted.')
     card_text = 'Visit {0}'.format(user['client_endpoint']['url'])
     return ask.statement(speech).simple_card('Smart Camera Streaming Link', card_text)
