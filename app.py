@@ -45,6 +45,8 @@ app.config['LWA'] = {
 }
 app.config['DEBUG'] = os.environ.get('DEBUG') == 'True'
 app.config['SECRET_KEY'] = os.environ['SECRET_KEY']
+app.url_map.strict_slashes = False
+
 if not app.debug:
     app.config['SERVER_NAME'] = os.environ.get('SERVER_NAME', '0.0.0.0')
 
@@ -52,6 +54,13 @@ login_manager = flask_login.LoginManager()
 login_manager.init_app(app)
 oauth = OAuth2Provider()
 oauth.init_app(app)
+
+
+@app.before_request
+def clear_trailing():
+    rp = request.path
+    if rp != '/' and rp.endswith('/'):
+        return redirect(rp[:-1])
 
 
 @login_manager.user_loader
