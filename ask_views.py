@@ -1,5 +1,6 @@
 import logging
 from functools import wraps
+from urllib.parse import urlparse
 
 import flask_ask as ask
 import requests
@@ -89,9 +90,14 @@ def help_intent():
 def stream_intent(stream_query):
     user = UsersTable.get_token_by_access_id(
         ask.session['user']['accessToken'])
+    client_endpoint = urlparse(user['client_endpoint']['url'])
+
     speech = ('Visit the Alexa app to get the stream URL for your smart camera. ' +
               'Remember to use your login credentials for the URL when prompted.')
-    card_text = 'Visit {0}'.format(user['client_endpoint']['url'])
+    card_text = 'Visit http://{0}:{1}@{2}:{3}/'.format(user['client_endpoint']['username'],
+                                                       user['client_endpoint']['password'],
+                                                       client_endpoint.hostname,
+                                                       client_endpoint.port)
     return ask.statement(speech).simple_card('Smart Camera Streaming Link', card_text)
 
 
