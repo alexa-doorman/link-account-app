@@ -83,6 +83,10 @@ def help_intent():
     return ask.question(speech).simple_card('Help', card_text)
 
 
+def make_error_statement(message):
+    return ask.statement(message).simple_card('Error occured!', message)
+
+
 @ask_routes.intent('StreamIntent', mapping={
     'stream_query': 'StreamQuery'
 })
@@ -90,19 +94,19 @@ def help_intent():
 def stream_intent(stream_query):
     user = UsersTable.get_token_by_access_id(
         ask.session['user']['accessToken'])
+
+    if 'client_endpoint' not in user:
+        return make_error_statement("You don't have any cameras available!")
+
     client_endpoint = urlparse(user['client_endpoint']['url'])
 
-    speech = ('Visit the Alexa app to get the stream URL for your smart camera. ' +
+    speech = ('Visit the Alexa app to get the stream preview URL for your smart camera. ' +
               'Remember to use your login credentials for the URL when prompted.')
-    card_text = 'Visit http://{0}:{1}@{2}:{3}/'.format(user['client_endpoint']['username'],
-                                                       user['client_endpoint']['password'],
-                                                       client_endpoint.hostname,
-                                                       client_endpoint.port)
+    card_text = 'Visit http://{0}:{1}@{2}:{3}/frame'.format(user['client_endpoint']['username'],
+                                                           user['client_endpoint']['password'],
+                                                           client_endpoint.hostname,
+                                                           client_endpoint.port)
     return ask.statement(speech).simple_card('Smart Camera Streaming Link', card_text)
-
-
-def make_error_statement(message):
-    return ask.statement(message).simple_card('Error occured!', message)
 
 
 @ask_routes.intent('CheckDoorIntent', mapping={
@@ -114,6 +118,9 @@ def check_door_intent(check_door_query):
         ask.session['user']['accessToken'])
 
     try:
+        if 'client_endpoint' not in user:
+            return make_error_statement("You don't have any cameras available!")
+
         objects_request = requests.get(
             '{0}/process'.format(user['client_endpoint']['url']),
             auth=(user['client_endpoint']['username'], user['client_endpoint']['password']))
