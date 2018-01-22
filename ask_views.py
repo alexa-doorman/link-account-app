@@ -87,26 +87,37 @@ def make_error_statement(message):
     return ask.statement(message).simple_card('Error occured!', message)
 
 
-@ask_routes.intent('StreamIntent', mapping={
-    'stream_query': 'StreamQuery'
+@ask_routes.intent('StatusIntent', mapping={
+    'status_query': 'StatusQuery'
 })
 @has_access_token
-def stream_intent(stream_query):
+def stream_intent(status_query):
     user = UsersTable.get_token_by_access_id(
         ask.session['user']['accessToken'])
 
     if 'client_endpoint' not in user:
         return make_error_statement("You don't have any cameras available!")
 
-    client_endpoint = urlparse(user['client_endpoint']['url'])
-
     speech = ('Visit the Alexa app to get the stream preview URL for your smart camera. ' +
               'Remember to use your login credentials for the URL when prompted.')
-    card_text = 'Visit http://{0}:{1}@{2}:{3}/frame'.format(user['client_endpoint']['username'],
-                                                           user['client_endpoint']['password'],
-                                                           client_endpoint.hostname,
-                                                           client_endpoint.port)
-    return ask.statement(speech).simple_card('Smart Camera Streaming Link', card_text)
+    try:
+        status_request = requests.get(user['client_endpoint']['url'],
+                                      auth=(user['client_endpoint']['username'], user['client_endpoint']['password']))
+        if status_request.status_code != 200:
+            return make_error_statement('An error occurred with your stream client process ' +
+                                        'endpoint which returned {0}'.format(
+                                            status_request.status_code))
+        data = status_request.json()
+        if data['camera']:
+            speech = ('Your smart camera is operational.')
+        else:
+            speech = (
+                'Your smart camera is not working. Please try to restart the camera.')
+    except ValueError as e:
+        logger.exception("Error occured")
+        return make_error_statement('An error occured with your stream client endpoint" with the error {0}'.format(str(e)))
+
+    return ask.statement(speech).simple_card('Smart Camera Health', speech)
 
 
 @ask_routes.intent('CheckDoorIntent', mapping={
