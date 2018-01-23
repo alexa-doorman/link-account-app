@@ -51,11 +51,11 @@ def has_access_token(f):
 def launch():
     card_title = 'Doorman - check who (or what) is at the door'
     text = ('Doorman is a DIY project that can tell you if someone or something is at the door. ' +
-            'Doorman can also provide you the link to view a feed of your camera. You can ' +
+            'Doorman can also provide you the status of your camera. You can ' +
             'also enable the Doorman Streamer Smart Home Skill to access your camera ' +
             'on a capable device. ')
     prompt = ('Would you like me to check what is ' +
-              'at the door or get a link to view your web camera?')
+              'at the door or check the status of your camera?')
     return ask.question(text + prompt).reprompt(prompt).simple_card(card_title, text)
 
 
@@ -78,7 +78,7 @@ def help_intent():
     speech = ('To use Doorman you need to setup a streaming and object detection API. ' +
               'I have sent a link to your Alexa app to a tutorial on how to set both up. ' +
               'If you have already setup the devices, you can ask to check the door or ' +
-              'get a stream link.')
+              'check the status of your camera.')
     card_text = speech + '\n' + 'Visit ' + TUTORIAL_LINK
     return ask.question(speech).simple_card('Help', card_text)
 

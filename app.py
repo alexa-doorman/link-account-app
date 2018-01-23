@@ -54,6 +54,7 @@ login_manager.init_app(app)
 oauth = OAuth2Provider()
 oauth.init_app(app)
 
+
 @login_manager.user_loader
 def user_loader(amazon_id):
     user_data = UsersTable(amazon_id).get()
@@ -230,30 +231,30 @@ def update():
                                    form=request.form)
 
         # Now verify secret-key is set properly
-        # try:
-        #     logger.info('Checking UPSTREAM_SECRET_KEY is correct')
-        #     if client_endpoint.endswith('/'):
-        #         verify_endpoint = '{0}{1}'.format(
-        #             client_endpoint, 'verify-key')
-        #     else:
-        #         verify_endpoint = '{0}/{1}'.format(
-        #             client_endpoint, 'verify-key')
-        #     up_key_request = requests.get(verify_endpoint,
-        #                                   timeout=6,
-        #                                   auth=(request.form['client_endpoint_username'],
-        #                                         request.form['client_endpoint_password']),
-        #                                   json={'UPSTREAM_REPORT_KEY': flask_login.current_user.data['uuid']})
-        #     if up_key_request.status_code != 200:
-        #         return render_template('index.html',
-        #                                error={'message': failed_reach_message.format(
-        #                                    'CLIENT VERIFY', verify_endpoint)},
-        #                                form=request.form)
-        # except Exception as e:
-        #     logger.error(str(e))
-        #     return render_template('index.html',
-        #                            error={'message': failed_reach_message.format(
-        #                                'CLIENT VERIFY', verify_endpoint)},
-        #                            form=request.form)
+        try:
+            logger.info('Checking UPSTREAM_SECRET_KEY is correct')
+            if client_endpoint.endswith('/'):
+                verify_endpoint = '{0}{1}'.format(
+                    client_endpoint, 'verify-key')
+            else:
+                verify_endpoint = '{0}/{1}'.format(
+                    client_endpoint, 'verify-key')
+            up_key_request = requests.get(verify_endpoint,
+                                          timeout=6,
+                                          auth=(request.form['client_endpoint_username'],
+                                                request.form['client_endpoint_password']),
+                                          json={'UPSTREAM_REPORT_KEY': flask_login.current_user.data['uuid']})
+            if up_key_request.status_code != 200:
+                return render_template('index.html',
+                                       error={'message': failed_reach_message.format(
+                                           'CLIENT VERIFY', verify_endpoint)},
+                                       form=request.form)
+        except Exception as e:
+            logger.error(str(e))
+            return render_template('index.html',
+                                   error={'message': failed_reach_message.format(
+                                       'CLIENT VERIFY', verify_endpoint)},
+                                   form=request.form)
 
         client_stats = {
             'url': client_endpoint,
