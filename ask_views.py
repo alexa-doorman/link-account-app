@@ -147,8 +147,8 @@ def check_door_intent(check_door_query):
             data['results'].sort(
                 key=lambda item: item['confidence'], reverse=True)
             if len(data['results']) == 1:
-                speech = "I found a {0} at your door which I am {1}%% confident about.".format(
-                    data['results'][0]['label'], int(data['results'][0]['confidence'] / 100))
+                speech = "I found a {0} at your door which I am {1} percent confident about.".format(
+                    data['results'][0]['label'], int(data['results'][0]['confidence'] * 100))
                 return ask.statement(speech)
             else:
                 stuff = {}
