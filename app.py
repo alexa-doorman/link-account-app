@@ -36,7 +36,6 @@ if not logger.handlers:
 
 logger.setLevel(logging.INFO)
 
-
 app = Flask(__name__)
 
 app.config['LWA'] = {
@@ -45,9 +44,6 @@ app.config['LWA'] = {
 }
 app.config['DEBUG'] = os.environ.get('DEBUG') == 'True'
 app.config['SECRET_KEY'] = os.environ['SECRET_KEY']
-
-if not app.debug:
-    app.config['SERVER_NAME'] = os.environ.get('SERVER_NAME', '0.0.0.0')
 
 login_manager = flask_login.LoginManager()
 login_manager.init_app(app)
@@ -81,12 +77,11 @@ def internal_error(error):
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    logger.info(session)
     if 'client_id' in request.args:
         session['oauth_flow_args'] = request.args
     if (flask_login.current_user.is_authenticated and
-        flask_login.current_user.data.get('yolo_endpoint') and
-        flask_login.current_user.data.get('client_endpoint') and
+            flask_login.current_user.data.get('yolo_endpoint') and
+            flask_login.current_user.data.get('client_endpoint') and
             session.get('linking') and
             session.get('oauth_flow_args')):
         return redirect(url_for('authorize', **session['oauth_flow_args']))
@@ -120,12 +115,15 @@ def verify():
     if 'access_token' not in request.args:
         return make_response(jsonify({'status': 'error', 'message': 'access_token missing!'}), 400)
     check_request = requests.get(
-        'https://api.amazon.com/auth/o2/tokeninfo?access_token={0}'.format(request.args['access_token']))
+        'https://api.amazon.com/auth/o2/tokeninfo?access_token={0}'.format(request.args['access_token']),
+        verify=False
+    )
     data = check_request.json()
     if data['aud'] != app.config['LWA']['consumer_key']:
         return make_response(jsonify({'status': 'error', 'message': 'wrong client id'}), 400)
     profile_request = requests.get('https://api.amazon.com/user/profile',
-                                   headers={'Authorization': 'bearer {0}'.format(request.args['access_token'])})
+                                   headers={'Authorization': 'bearer {0}'.format(request.args['access_token'])},
+                                   verify=False)
     profile_data = profile_request.json()
     user_table = UsersTable(profile_data['user_id'])
     if user_table.get() is None:
@@ -284,8 +282,7 @@ def report():
 from oauth_views import *
 from ask_views import *
 
-
 if __name__ == '__main__':
     app.run(debug=os.environ.get('DEBUG') == 'True',
-            host=os.environ.get('SERVER_NAME', '0.0.0.0'),
+            host='0.0.0.0',
             port=5003)

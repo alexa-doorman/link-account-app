@@ -3,6 +3,8 @@
 
 secret.py
 
+.vscode/
+*.zip
 ### macOS ###
 *.DS_Store
 .AppleDouble

@@ -5,10 +5,6 @@
         "profile_name": "default",
         "project_name": "link-account-ap",
         "runtime": "python3.6",
-        "s3_bucket": "zappa-doorman-link-app",
-        "domain": "doorman.printdebug.com",
-        "environment_variables": {
-            "SERVER_NAME": "doorman.printdebug.com"
-        }
+        "s3_bucket": "zappa-doorman-link-app"
     }
 }
